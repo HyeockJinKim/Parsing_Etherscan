@@ -3,7 +3,8 @@ from urllib.request import urlopen, Request
 
 from bs4 import BeautifulSoup
 
-ETHERSCAN_URL = 'https://etherscan.io/txs?block='
+ETHERSCAN_BASE_URL = 'https://etherscan.io'
+ETHERSCAN_BLOCKS_URL = ETHERSCAN_BASE_URL+'/txs?block='
 
 
 def set_request(url):
@@ -22,11 +23,17 @@ def set_request(url):
     return html
 
 
+def get_tx_info(tx_link):
+    url = ETHERSCAN_BASE_URL + tx_link.find('a')['href']
+    html = set_request(url)
+    gas_fee = html.find(attrs={'id': 'ContentPlaceHolder1_spanGasUsedByTxn'}).text.split('(')[0].replace(',', '')
+    return int(gas_fee)
+
+
 def parse_html(html):
     body = html.find(attrs={'class': 'table-hover'}).find('tbody')
     txs = body.find_all('tr')
-    tx_fee = [tx.find_all('td')[-1].text for tx in txs]
-
+    tx_fee = [get_tx_info(tx.find_all('td')[0]) for tx in txs]
     return tx_fee
 
 
@@ -36,17 +43,12 @@ def crawl_etherscan(block_num, block_range):
         tx_fees = []
         for j in range(1, 100, 1):
             try:
-                url = ETHERSCAN_URL+str(i)+'&p='+str(j)
+                url = ETHERSCAN_BLOCKS_URL + str(i) + '&p=' + str(j)
                 html = set_request(url)
                 fee = parse_html(html)
                 tx_fees += fee
             except:
                 break
-        blocks_tx_fee.append(tx_fees)
+        blocks_tx_fee += tx_fees
 
     return blocks_tx_fee
-
-
-if __name__ == '__main__':
-    blocks_fee = crawl_etherscan(7265262, 5)
-    print(blocks_fee)
